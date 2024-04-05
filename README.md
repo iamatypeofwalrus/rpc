@@ -22,4 +22,8 @@ What is this library trying to do?
 
 4. Runnable in a servless context
 
+Non-goals
+
+* Be a cross language, general purpose RPC framework.
+
 
