@@ -35,6 +35,8 @@ func Register[Input any, Output any](mux *http.ServeMux, httpMethod HTTPMethod, 
 	mux.HandleFunc(muxPath, func(w http.ResponseWriter, r *http.Request) {
 		req := h.Input()
 
+		w.Header().Set("Content-Type", "application/json")
+
 		// TODO support path parameters, too
 		if httpMethod == GET || httpMethod == http.MethodDelete {
 			query := r.URL.Query()
@@ -69,7 +71,6 @@ func Register[Input any, Output any](mux *http.ServeMux, httpMethod HTTPMethod, 
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			HandleError(w, InternalServerError)
 		}
