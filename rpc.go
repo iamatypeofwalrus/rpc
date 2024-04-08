@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 
 	"github.com/gorilla/schema"
 )
 
 var decoder = schema.NewDecoder()
+var defaultMiddleware []Middleware = []Middleware{}
 
 func init() {
 	decoder.IgnoreUnknownKeys(true)
@@ -28,11 +30,12 @@ type RpcHandler[Input any, Output any] interface {
 	Handle(Input) (Output, error)
 }
 
-func Register[Input any, Output any](mux *http.ServeMux, httpMethod HTTPMethod, path string, h RpcHandler[Input, Output]) {
+// Register registers a new RPC handler to the given mux.
+// handlers are applied in the order they are registered. Handlers regiestered with RegisterMiddleware are applied first.
+func Register[Input any, Output any](mux *http.ServeMux, httpMethod HTTPMethod, path string, h RpcHandler[Input, Output], rpcMiddleware ...Middleware) {
 	muxPath := fmt.Sprintf("%s %s", httpMethod, path)
 
-	// Register the handler to the mux
-	mux.HandleFunc(muxPath, func(w http.ResponseWriter, r *http.Request) {
+	rpcHandlerFunc := func(w http.ResponseWriter, r *http.Request) {
 		req := h.Input()
 
 		w.Header().Set("Content-Type", "application/json")
@@ -74,7 +77,33 @@ func Register[Input any, Output any](mux *http.ServeMux, httpMethod HTTPMethod, 
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			HandleError(w, InternalServerError)
 		}
-	})
+	}
+
+	rpcHandler := http.HandlerFunc(rpcHandlerFunc)
+
+	clonedDefaultMiddleware := slices.Clone(defaultMiddleware)
+	clonedDefaultMiddleware = append(clonedDefaultMiddleware, rpcMiddleware...)
+
+	wrappedHandler := chainMiddleware(rpcHandler, clonedDefaultMiddleware)
+
+	// Register the handler to the mux
+	mux.Handle(muxPath, wrappedHandler)
 
 	registerHandlerForDocs(httpMethod, path, h)
+}
+
+// RegisterMiddleware registers a middleware that is used for all RPCs that are registed.
+// Use the handlers argument in Register to apply RPC specific middleware in addition to the default middleware.
+//
+// Handlers are applied in the order they are registered.
+func RegisterMiddleware(middlewware ...Middleware) {
+	defaultMiddleware = append(defaultMiddleware, middlewware...)
+}
+
+func chainMiddleware(final http.Handler, middleware []Middleware) http.Handler {
+	for i := len(middleware) - 1; i >= 0; i-- {
+		final = middleware[i](final)
+	}
+
+	return final
 }
