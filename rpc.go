@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -27,7 +28,7 @@ const (
 type RpcHandler[Input any, Output any] interface {
 	Input() Input
 	Output() Output
-	Handle(Input) (Output, error)
+	Handle(ctx context.Context, input Input) (Output, error)
 }
 
 // Register registers a new RPC handler to the given mux.
@@ -68,7 +69,7 @@ func Register[Input any, Output any](mux *http.ServeMux, httpMethod HTTPMethod, 
 			}
 		}
 
-		resp, err := h.Handle(req)
+		resp, err := h.Handle(r.Context(), req)
 		if err != nil {
 			HandleError(w, err)
 			return

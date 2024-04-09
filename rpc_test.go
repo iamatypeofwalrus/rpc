@@ -1,6 +1,7 @@
 package rpc
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -26,7 +27,7 @@ func (h *TestHandler) Output() *ResponseTest {
 	return &ResponseTest{}
 }
 
-func (h *TestHandler) Handle(RequestTest *RequestTest) (*ResponseTest, error) {
+func (h *TestHandler) Handle(ctx context.Context, r *RequestTest) (*ResponseTest, error) {
 	return &ResponseTest{Output: "success"}, nil
 }
 
