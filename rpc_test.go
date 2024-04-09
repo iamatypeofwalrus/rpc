@@ -1,35 +1,13 @@
 package rpc
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
-
-type RequestTest struct {
-	Input string `schema:"input,required" json:"input"`
-}
-
-type ResponseTest struct {
-	Output string `json:"output"`
-}
-
-type TestHandler struct{}
-
-func (h *TestHandler) Input() *RequestTest {
-	return &RequestTest{}
-}
-
-func (h *TestHandler) Output() *ResponseTest {
-	return &ResponseTest{}
-}
-
-func (h *TestHandler) Handle(ctx context.Context, r *RequestTest) (*ResponseTest, error) {
-	return &ResponseTest{Output: "success"}, nil
-}
 
 func TestGetSuccess(t *testing.T) {
 	mux := http.NewServeMux()
@@ -66,6 +44,95 @@ func TestGetWithoutParams(t *testing.T) {
 	Register(mux, GET, "/test", handler)
 
 	req, err := http.NewRequest(http.MethodGet, "/test", nil)
+	if err != nil {
+		t.Fatalf("Could not create request: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusBadRequest {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusBadRequest)
+	}
+}
+
+func TestGetFailure(t *testing.T) {
+	mux := http.NewServeMux()
+	handler := &TestHandlerFailure{
+		err: fmt.Errorf("error"),
+	}
+
+	Register(mux, GET, "/test", handler)
+
+	req, err := http.NewRequest(http.MethodGet, "/test?input=hello", nil)
+	if err != nil {
+		t.Fatalf("Could not create request: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusInternalServerError {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusInternalServerError)
+	}
+}
+
+func TestGetBadJSON(t *testing.T) {
+	mux := http.NewServeMux()
+	handler := TestHandlerBadJSON{}
+
+	Register(mux, GET, "/test", handler)
+
+	req, err := http.NewRequest(http.MethodGet, "/test?input=hello", nil)
+	if err != nil {
+		t.Fatalf("Could not create request: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusInternalServerError {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusInternalServerError)
+	}
+}
+
+func TestPostSuccess(t *testing.T) {
+	mux := http.NewServeMux()
+	handler := &TestHandler{}
+
+	Register(mux, POST, "/test", handler)
+
+	reqBody := `{"input":"hello"}`
+	req, err := http.NewRequest(http.MethodPost, "/test", strings.NewReader(reqBody))
+	if err != nil {
+		t.Fatalf("Could not create request: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	var response ResponseTest
+	err = json.NewDecoder(rr.Body).Decode(&response)
+	if err != nil {
+		t.Fatalf("Could not decode response: %v", err)
+	}
+	if response.Output != "success" {
+		t.Errorf("Unexpected output value: got %s, want %s", response.Output, "success")
+	}
+
+}
+
+func TestPostWithoutBody(t *testing.T) {
+	mux := http.NewServeMux()
+	handler := &TestHandler{}
+
+	Register(mux, POST, "/test", handler)
+
+	req, err := http.NewRequest(http.MethodPost, "/test", strings.NewReader(""))
 	if err != nil {
 		t.Fatalf("Could not create request: %v", err)
 	}
@@ -234,4 +301,29 @@ func TestHandlerNameMiddleware(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	mux.ServeHTTP(rr, req)
+}
+
+func TestDocsEndpoint(t *testing.T) {
+	mux := http.NewServeMux()
+
+	// Assuming you have a function to register your endpoints
+	RegisterDocsEndpoint(mux)
+
+	req, err := http.NewRequest(http.MethodGet, "/rpc/docs", nil)
+	if err != nil {
+		t.Fatalf("Could not create request: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+
+	if status := rr.Code; status != http.StatusOK {
+		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	}
+
+	// Check the response body
+	responseBody := rr.Body.String()
+	if responseBody == "" {
+		t.Errorf("Expected non-empty response body")
+	}
 }

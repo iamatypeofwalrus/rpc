@@ -89,7 +89,7 @@ func Register[Input any, Output any](mux *http.ServeMux, httpMethod HTTPMethod, 
 	middleware = append([]Middleware{handlerNameMiddleware(h)}, middleware...)
 	middleware = append(middleware, rpcMiddleware...)
 
-	wrappedHandler := chainMiddleware(rpcHandler, middleware)
+	wrappedHandler := chainMiddleware(rpcHandler, middleware...)
 
 	// Register the handler to the mux
 	mux.Handle(muxPath, wrappedHandler)
@@ -105,7 +105,7 @@ func RegisterMiddleware(middlewware ...Middleware) {
 	defaultMiddleware = append(defaultMiddleware, middlewware...)
 }
 
-func chainMiddleware(final http.Handler, middleware []Middleware) http.Handler {
+func chainMiddleware(final http.Handler, middleware ...Middleware) http.Handler {
 	for i := len(middleware) - 1; i >= 0; i-- {
 		final = middleware[i](final)
 	}

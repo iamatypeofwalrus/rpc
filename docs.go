@@ -29,9 +29,21 @@ type RpcEndpoint struct {
 var rpcRegistry []RpcEndpoint
 
 func RegisterDocsEndpoint(mux *http.ServeMux) {
-	mux.HandleFunc("/rpc/docs", func(w http.ResponseWriter, r *http.Request) {
+	middleware := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			SetHandlerNameInContext(r.Context(), "RpcDocs")
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(rpcRegistry)
 	})
+
+	mux.Handle(
+		"/rpc/docs",
+		chainMiddleware(h, middleware),
+	)
 }
 
 func registerHandlerForDocs[Input any, Output any](httpMethod HTTPMethod, path string, h RpcHandler[Input, Output]) {
@@ -59,6 +71,10 @@ func registerHandlerForDocs[Input any, Output any](httpMethod HTTPMethod, path s
 }
 
 func getFields(i interface{}) map[string]string {
+	if i == nil {
+		return nil
+	}
+
 	fields := make(map[string]string)
 	v := reflect.ValueOf(i)
 
