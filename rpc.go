@@ -82,10 +82,14 @@ func Register[Input any, Output any](mux *http.ServeMux, httpMethod HTTPMethod, 
 
 	rpcHandler := http.HandlerFunc(rpcHandlerFunc)
 
-	clonedDefaultMiddleware := slices.Clone(defaultMiddleware)
-	clonedDefaultMiddleware = append(clonedDefaultMiddleware, rpcMiddleware...)
+	// Cloning the middleware as we are going to mutate the slice
+	middleware := slices.Clone(defaultMiddleware)
 
-	wrappedHandler := chainMiddleware(rpcHandler, clonedDefaultMiddleware)
+	// The handler name is always the first middleware so downstream middleware can access it
+	middleware = append([]Middleware{handlerNameMiddleware(h)}, middleware...)
+	middleware = append(middleware, rpcMiddleware...)
+
+	wrappedHandler := chainMiddleware(rpcHandler, middleware)
 
 	// Register the handler to the mux
 	mux.Handle(muxPath, wrappedHandler)

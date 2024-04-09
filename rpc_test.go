@@ -212,3 +212,26 @@ func TestDefaultAndRpcMiddlewareOrder(t *testing.T) {
 	// reset middleware
 	defaultMiddleware = []Middleware{}
 }
+
+func TestHandlerNameMiddleware(t *testing.T) {
+	mux := http.NewServeMux()
+	middlewareTest := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			handlerName := GetHandlerNameFromContext(r.Context())
+			if handlerName != "TestHandler" {
+				t.Errorf("Expected handler name to be 'TestHandler', got '%s'", handlerName)
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	Register(mux, GET, "/test", &TestHandler{}, middlewareTest)
+
+	req, err := http.NewRequest(http.MethodGet, "/test", nil)
+	if err != nil {
+		t.Fatalf("Could not create request: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+}
