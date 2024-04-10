@@ -32,8 +32,8 @@ var rpcRegistry []RpcEndpoint
 func RegisterDocsEndpoint(mux *http.ServeMux) {
 	contextMiddleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			SetHandlerNameInContext(r.Context(), "RpcDocs")
-			next.ServeHTTP(w, r)
+			ctx := SetHandlerNameInContext(r.Context(), "RpcDocs")
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 

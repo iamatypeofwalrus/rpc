@@ -12,7 +12,6 @@ import (
 )
 
 var decoder = schema.NewDecoder()
-var defaultMiddleware []Middleware = []Middleware{}
 
 func init() {
 	decoder.IgnoreUnknownKeys(true)
@@ -95,20 +94,4 @@ func Register[Input any, Output any](mux *http.ServeMux, httpMethod HTTPMethod, 
 	mux.Handle(muxPath, wrappedHandler)
 
 	registerHandlerForDocs(httpMethod, path, h)
-}
-
-// RegisterMiddleware registers a middleware that is used for all RPCs that are registed.
-// Use the handlers argument in Register to apply RPC specific middleware in addition to the default middleware.
-//
-// Handlers are applied in the order they are registered.
-func RegisterMiddleware(middlewware ...Middleware) {
-	defaultMiddleware = append(defaultMiddleware, middlewware...)
-}
-
-func chainMiddleware(final http.Handler, middleware ...Middleware) http.Handler {
-	for i := len(middleware) - 1; i >= 0; i-- {
-		final = middleware[i](final)
-	}
-
-	return final
 }
