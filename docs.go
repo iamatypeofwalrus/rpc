@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"reflect"
+	"slices"
 )
 
 var goToJsonTypes = map[string]string{
@@ -29,12 +30,15 @@ type RpcEndpoint struct {
 var rpcRegistry []RpcEndpoint
 
 func RegisterDocsEndpoint(mux *http.ServeMux) {
-	middleware := func(next http.Handler) http.Handler {
+	contextMiddleware := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			SetHandlerNameInContext(r.Context(), "RpcDocs")
 			next.ServeHTTP(w, r)
 		})
 	}
+
+	middleware := slices.Clone(defaultMiddleware)
+	middleware = append([]Middleware{contextMiddleware}, middleware...)
 
 	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(rpcRegistry)
@@ -42,7 +46,7 @@ func RegisterDocsEndpoint(mux *http.ServeMux) {
 
 	mux.Handle(
 		"/rpc/docs",
-		chainMiddleware(h, middleware),
+		chainMiddleware(h, middleware...),
 	)
 }
 
